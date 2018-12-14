@@ -113,7 +113,7 @@ class ImageGui:
         :param label: The label that the user voted for
         """
         input_path = self.paths[self.index]
-        self._copy_image(input_path, label)
+        self._move_image(input_path, label)
         self.show_next_image()
 
     def vote_key(self, event):
@@ -134,6 +134,19 @@ class ImageGui:
         :return: Resized image
         """
         image = Image.open(path)
+        w, h = image.size
+        if max(w, h) > 1024:
+            if w > h:
+                size = (1024, int(1024.0*h/w + 0.5))
+            else:
+                size = (int(1024.0*w/h+0.5), 1024)
+        elif min(w, h) < 640:
+            if w < h:
+                size = (640, int(640.0*h/w + 0.5))
+            else:
+                size = (int(640.0*w/h+0.5), 640)
+        else:
+            size = (w, h)
         image = image.resize(size, Image.ANTIALIAS)
         return image
 
@@ -193,7 +206,7 @@ if __name__ == "__main__":
     # Put all image file paths into a list
     paths = []
     for file in os.listdir(input_folder):
-        if file.endswith(".tif") or file.endswith(".tiff"):
+        if file.endswith(".jpg") or file.endswith(".jpeg"):
 
             path = os.path.join(input_folder, file)
             paths.append(path)
@@ -202,3 +215,11 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = ImageGui(root, labels, paths)
     root.mainloop()
+
+    for f in os.listdir(input_folder):
+        fname = os.path.join(input_folder, f)
+        if not os.path.isdir(fname):
+            continue
+        output_txt = os.path.join(input_folder, f + '.txt')
+        with open(output_txt, 'w') as fp:
+            fp.write('\n'.join(os.listdir(fname)))
