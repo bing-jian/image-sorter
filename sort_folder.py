@@ -211,15 +211,22 @@ if __name__ == "__main__":
             path = os.path.join(input_folder, file)
             paths.append(path)
 
-    # Start the GUI
-    root = tk.Tk()
-    app = ImageGui(root, labels, paths)
-    root.mainloop()
+    if len(paths) > 0:
+        # Start the GUI
+        root = tk.Tk()
+        app = ImageGui(root, labels, paths)
+        root.mainloop()
 
+    all_files = []
     for f in os.listdir(input_folder):
         fname = os.path.join(input_folder, f)
         if not os.path.isdir(fname):
             continue
         output_txt = os.path.join(input_folder, f + '.txt')
         with open(output_txt, 'w') as fp:
-            fp.write('\n'.join(os.listdir(fname)))
+            flist = os.listdir(fname)
+            fp.write('\n'.join(flist))
+            all_files += flist
+    output_txt = os.path.join(input_folder, '_all_.txt')
+    with open(output_txt, 'w') as fp:
+        fp.write('\n'.join(all_files))
