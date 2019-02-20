@@ -70,16 +70,20 @@ class ImageGui:
         for ll, button in enumerate(self.buttons):
             button.grid(row=0, column=ll, sticky='we')
             #frame.grid_columnconfigure(ll, weight=1)
+            button.config(font=("Courier", 14))
 
         # Place progress label in grid
         self.progress_label.grid(row=0, column=self.n_labels, sticky='we')
+        self.progress_label.config(font=("Courier", 14))
 
         self.fname_label = tk.Label(frame)
         self.fname_label.grid(row=1, column=0)
+        self.fname_label.config(font=("Courier", 14))
 
         self.text_content = tk.StringVar()
         self.text_entry = tk.Entry(frame, textvariable=self.text_content)
         self.text_entry.grid(row=1, column=1, columnspan=self.n_labels+1, sticky='we')
+        self.text_entry.config(font=("Courier", 14))
 
         # Place the image in grid
         # Set empty image container
@@ -119,9 +123,9 @@ class ImageGui:
         basename = os.path.splitext(os.path.basename(path))[0]
         self.fname_label.configure(text=basename)
         if basename in self.notes:
-            self.text_content.set(self.notes[basename])
+            self.text_content.set(self.notes[basename[:11]])
         else:
-            self.text_content.set(basename)
+            self.text_content.set(basename[12:])
 
 
     def vote(self, label):
@@ -131,7 +135,7 @@ class ImageGui:
         """
         input_path = self.paths[self.index]
         basename = os.path.splitext(os.path.basename(input_path))[0]
-        self.notes[basename] = self.text_entry.get()
+        self.notes[basename[:11]] = self.text_entry.get()
         if label != self.SKIP_LABEL:
             self._move_image(input_path, label)
         self.show_next_image()
@@ -251,21 +255,20 @@ if __name__ == "__main__":
         root = tk.Tk()
         app = ImageGui(root, labels, paths, notes=notes)
         root.mainloop()
+        pkl_file = os.path.join(input_folder, 'notes.pkl')
+        with open(pkl_file, 'wb') as fp:
+            pickle.dump(app.notes, fp)
 
-    pkl_file = os.path.join(input_folder, 'notes.pkl')
-    with open(pkl_file, 'wb') as fp:
-        pickle.dump(app.notes, fp)
-
-    all_files = []
-    for f in os.listdir(input_folder):
-        fname = os.path.join(input_folder, f)
-        if not os.path.isdir(fname):
-            continue
-        output_txt = os.path.join(input_folder, f + '.txt')
+        all_files = []
+        for f in os.listdir(input_folder):
+            fname = os.path.join(input_folder, f)
+            if not os.path.isdir(fname):
+                continue
+            output_txt = os.path.join(input_folder, f + '.txt')
+            with open(output_txt, 'w') as fp:
+                flist = os.listdir(fname)
+                fp.write('\n'.join(flist))
+                all_files += flist
+        output_txt = os.path.join(input_folder, '_all_.txt')
         with open(output_txt, 'w') as fp:
-            flist = os.listdir(fname)
-            fp.write('\n'.join(flist))
-            all_files += flist
-    output_txt = os.path.join(input_folder, '_all_.txt')
-    with open(output_txt, 'w') as fp:
-        fp.write('\n'.join(all_files))
+            fp.write('\n'.join(all_files))
