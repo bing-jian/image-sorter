@@ -90,9 +90,10 @@ class ImageGui:
         self.set_image(paths[self.index])
         self.image_panel.grid(row=2, column=0, columnspan=self.n_labels+1, sticky='we')
 
-        # key bindings (so number pad can be used as shortcut)
-        for key in range(self.n_labels):
-            master.bind(str(key), self.vote_key)
+        ## key bindings (so number pad can be used as shortcut)
+        ## [disable key bindings]
+        # for key in range(self.n_labels):
+        #     master.bind(str(key), self.vote_key)
 
     def show_next_image(self):
         """
