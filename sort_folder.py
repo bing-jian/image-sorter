@@ -14,16 +14,20 @@
 import argparse
 import Tkinter as tk
 import os
+import pickle
 from shutil import copyfile, move
-from PIL import ImageTk, Image
+from PIL import ImageTk
+from PIL import Image
+
+ALLOW_ZOOMIN = False
 
 class ImageGui:
+    SKIP_LABEL = '*** NEXT ***'
     """
     GUI for iFind1 image sorting. This draws the GUI and handles all the events.
     Useful, for sorting views into sub views or for removing outliers from the data.
     """
-
-    def __init__(self, master, labels, paths):
+    def __init__(self, master, labels, paths, notes={}):
         """
         Initialise GUI
         :param master: The parent window
@@ -31,7 +35,7 @@ class ImageGui:
         :param paths: A list of file paths to images
         :return:
         """
-
+        self.notes = notes
         # So we can quit the window from within the functions
         self.master = master
 
@@ -44,23 +48,16 @@ class ImageGui:
         # Start at the first file name
         self.index = 0
         self.paths = paths
-        self.labels = labels
+        self.labels = [self.SKIP_LABEL]
+        self.labels += labels
 
         # Number of labels and paths
-        self.n_labels = len(labels)
+        self.n_labels = len(self.labels)
         self.n_paths = len(paths)
-
-        # Set empty image container
-        self.image_raw = None
-        self.image = None
-        self.image_panel = tk.Label(frame)
-
-        # set image container to first image
-        self.set_image(paths[self.index])
 
         # Make buttons
         self.buttons = []
-        for label in labels:
+        for label in self.labels:
             self.buttons.append(
                     tk.Button(frame, text=label, width=10, height=1, command=lambda l=label: self.vote(l))
             )
@@ -77,12 +74,25 @@ class ImageGui:
         # Place progress label in grid
         self.progress_label.grid(row=0, column=self.n_labels, sticky='we')
 
+        self.fname_label = tk.Label(frame)
+        self.fname_label.grid(row=1, column=0)
+
+        self.text_content = tk.StringVar()
+        self.text_entry = tk.Entry(frame, textvariable=self.text_content)
+        self.text_entry.grid(row=1, column=1, columnspan=self.n_labels+1, sticky='we')
+
         # Place the image in grid
-        self.image_panel.grid(row=1, column=0, columnspan=self.n_labels+1, sticky='we')
+        # Set empty image container
+        self.image_raw = None
+        self.image = None
+        self.image_panel = tk.Label(frame)
+        # set image container to first image
+        self.set_image(paths[self.index])
+        self.image_panel.grid(row=2, column=0, columnspan=self.n_labels+1, sticky='we')
 
         # key bindings (so number pad can be used as shortcut)
         for key in range(self.n_labels):
-            master.bind(str(key+1), self.vote_key)
+            master.bind(str(key), self.vote_key)
 
     def show_next_image(self):
         """
@@ -91,7 +101,6 @@ class ImageGui:
         self.index += 1
         progress_string = "%d/%d" % (self.index, self.n_paths)
         self.progress_label.configure(text=progress_string)
-
         if self.index < self.n_paths:
             self.set_image(self.paths[self.index])
         else:
@@ -106,6 +115,13 @@ class ImageGui:
         self.image_raw = image
         self.image = ImageTk.PhotoImage(image)
         self.image_panel.configure(image=self.image)
+        basename = os.path.splitext(os.path.basename(path))[0]
+        self.fname_label.configure(text=basename)
+        if basename in self.notes:
+            self.text_content.set(self.notes[basename])
+        else:
+            self.text_content.set(basename)
+
 
     def vote(self, label):
         """
@@ -113,7 +129,10 @@ class ImageGui:
         :param label: The label that the user voted for
         """
         input_path = self.paths[self.index]
-        self._move_image(input_path, label)
+        basename = os.path.splitext(os.path.basename(input_path))[0]
+        self.notes[basename] = self.text_entry.get()
+        if label != self.SKIP_LABEL:
+            self._move_image(input_path, label)
         self.show_next_image()
 
     def vote_key(self, event):
@@ -122,7 +141,7 @@ class ImageGui:
         :param event: The event contains information about which key was pressed
         """
         pressed_key = int(event.char)
-        label = self.labels[pressed_key-1]
+        label = self.labels[pressed_key]
         self.vote(label)
 
     @staticmethod
@@ -140,8 +159,8 @@ class ImageGui:
                 size = (1024, int(1024.0*h/w + 0.5))
             else:
                 size = (int(1024.0*w/h+0.5), 1024)
-        elif min(w, h) < 640:
-            if w < h:
+        elif ALLOW_ZOOMIN and min(w, h) < 640:
+            if w > h:
                 size = (640, int(640.0*h/w + 0.5))
             else:
                 size = (int(640.0*w/h+0.5), 640)
@@ -186,6 +205,8 @@ def make_folder(directory):
     if not os.path.exists(directory):
         os.makedirs(directory)
 
+
+
 # The main bit of the script only gets exectured if it is directly called
 if __name__ == "__main__":
 
@@ -193,11 +214,25 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-f', '--folder', help='Input folder where the *tif images should be', required=True)
     parser.add_argument('-l', '--labels', nargs='+', help='Possible labels in the images', required=True)
+
+    zoomin_parser = parser.add_mutually_exclusive_group(required=False)
+    zoomin_parser.add_argument('--zoomin', dest='zoomin', action='store_true')
+    zoomin_parser.add_argument('--no-zoomin', dest='zoomin', action='store_false')
+    parser.set_defaults(zoomin=False)
+
     args = parser.parse_args()
 
     # grab input arguments from args structure
     input_folder = args.folder
     labels = args.labels
+    ALLOW_ZOOMIN = args.zoomin
+
+    try:
+        pkl_file = os.path.join(input_folder, 'notes.pkl')
+        with open(pkl_file, 'rb') as fp:
+            notes = pickle.load(fp)
+    except:
+        notes = {}
 
     # Make folder for the new labels
     for label in labels:
@@ -207,15 +242,18 @@ if __name__ == "__main__":
     paths = []
     for file in os.listdir(input_folder):
         if file.endswith(".jpg") or file.endswith(".jpeg"):
-
             path = os.path.join(input_folder, file)
             paths.append(path)
 
     if len(paths) > 0:
         # Start the GUI
         root = tk.Tk()
-        app = ImageGui(root, labels, paths)
+        app = ImageGui(root, labels, paths, notes=notes)
         root.mainloop()
+
+    pkl_file = os.path.join(input_folder, 'notes.pkl')
+    with open(pkl_file, 'wb') as fp:
+        pickle.dump(app.notes, fp)
 
     all_files = []
     for f in os.listdir(input_folder):
